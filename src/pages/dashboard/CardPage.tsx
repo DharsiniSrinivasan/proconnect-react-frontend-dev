@@ -213,6 +213,7 @@ function ShipmentDashboard() {
               {shipmentData.totalShipments}
             </h2>
           </CardContent>
+          
         </Card>
 
         <Card className="relative">
