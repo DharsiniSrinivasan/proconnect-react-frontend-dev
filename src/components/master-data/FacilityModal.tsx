@@ -1,0 +1,331 @@
+import React, { useState, useEffect } from "react";
+import { X, Hourglass, List } from "lucide-react";
+import {
+  useCustomerStore,
+  useFacilityStore,
+  useTilesStore,
+} from "@/stores/masterStore";
+import { FacilityOverviewTable } from "./FacilityOverviewTable";
+import { toast } from "sonner";
+import { getStorage } from "@/utils/storage";
+import { Tabs, TabsList, TabsTrigger } from "../ui/tabs";
+import { MasterOverviewItem } from "@/types/master-data";
+
+interface ApprovalModalProps {
+  tile: MasterOverviewItem;
+  onClose: () => void;
+  onApprove?: (recordId: number) => void;
+  onReject?: (recordId: number) => void;
+  isRead?: boolean;
+}
+export type SortOrder = "A_TO_Z" | "Z_TO_A" | null;
+export const FacilityModal: React.FC<ApprovalModalProps> = ({
+  tile,
+  onClose,
+  isRead = false,
+}) => {
+  const [activeTab, setActiveTab] = useState("");
+  const [readOnly, setReadOnly] = useState(isRead);
+  const searchQuery = "";
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [tierFilter, setTierFilter] = useState("all");
+  const {
+    data,
+    pageSize,
+    setPageSize,
+    fetchFacility,
+    isLoading,
+    total,
+    fetchTiers,
+    fetchStatus,
+  } = useFacilityStore();
+  const [filter_name, setFilter_name] = useState("");
+  const [filter_customer, setCustomer_name] = useState("");
+  const [regionFilter, setRegionFilter] = useState("");
+  const [filter_request, setRequest_name] = useState("");
+  const [filter_assignee, setAssignee_name] = useState("");
+  const [capacity, setCapacity] = useState("");
+  const [fixed_cost, setFixed_cost] = useState("");
+  const [filter_reason, setFilter_reason] = useState("");
+  const [filter_last_action, setFilter_last_action] = useState(null);
+  const [sortBy, setSortBy] = useState<string | null>(null);
+  const [sortOrder, setSortOrder] = useState<SortOrder>(null);
+  const [currentPage, setCurrentPage] = useState<number>(0);
+  const { fetchRegion } = useCustomerStore();
+  const { updateStatus } = useTilesStore();
+  const storage = getStorage();
+  const token = storage.getItem("access_token");
+  const payload = JSON.parse(atob(token.split(".")[1]));
+  const userId = Number(payload?.sub);
+
+  useEffect(() => {
+    fetchStatus();
+    fetchTiers();
+    fetchRegion();
+  }, []);
+
+  useEffect(() => {
+    if (readOnly) {
+      setActiveTab("request");
+    } else {
+      setActiveTab("awaits");
+    }
+  }, [readOnly]);
+
+  useEffect(() => {
+    const Capacity = Number(capacity);
+    const Fixed_cost = Number(fixed_cost);
+    fetchFacility(
+      currentPage,
+      pageSize,
+      searchQuery,
+      statusFilter === "all" ? "" : statusFilter,
+      tierFilter === "all" ? "" : tierFilter,
+      filter_name,
+      regionFilter === "all" ? "" : regionFilter,
+      Capacity,
+      Fixed_cost,
+      sortBy,
+      sortOrder,
+      filter_customer,
+      readOnly ? "" : "Pending",
+      readOnly ? null : userId,
+      readOnly ? userId : null,
+      filter_reason,
+      filter_assignee,
+      filter_last_action,
+      filter_request,
+    );
+  }, [
+    currentPage,
+    pageSize,
+    searchQuery,
+    statusFilter,
+    tierFilter,
+    filter_name,
+    regionFilter,
+    capacity,
+    fixed_cost,
+    sortBy,
+    sortOrder,
+    filter_customer,
+    readOnly,
+    filter_reason,
+    filter_last_action,
+    filter_assignee,
+    filter_request,
+  ]);
+
+  const handleStatusFilterChange = (value: string) => {
+    setStatusFilter(value);
+  };
+
+  const handleTierFilterChange = (value: string) => {
+    setTierFilter(value);
+  };
+
+  const handleRegionFilterChange = (value: string) => {
+    setRegionFilter(value);
+  };
+  const handleAssigneeFilterChange = (value: string) => {
+    setAssignee_name(value);
+  };
+
+  const handleRequestFilterChange = (value: string) => {
+    setRequest_name(value);
+  };
+  const handleSortChange = (
+    newSortBy: string | null,
+    newSortOrder: SortOrder,
+  ) => {
+    setSortBy(newSortBy);
+    setSortOrder(newSortOrder);
+  };
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    if (value === "awaits") {
+      setReadOnly(false);
+    } else {
+      setReadOnly(true);
+    }
+  };
+
+  const handleApprove = async (ids: (string | number)[]) => {
+    const request = {
+      facility_ids: (ids || []).map(Number),
+      assigned_status: "Approved",
+      rejection_reason: "",
+    };
+    let success = false;
+    success = await updateStatus(request, tile?.id);
+    if (success) {
+      const Capacity = Number(capacity);
+      const Fixed_cost = Number(fixed_cost);
+      fetchFacility(
+        currentPage,
+        pageSize,
+        searchQuery,
+        statusFilter === "all" ? "" : statusFilter,
+        tierFilter === "all" ? "" : tierFilter,
+        filter_name,
+        regionFilter === "all" ? "" : regionFilter,
+        Capacity,
+        Fixed_cost,
+        sortBy,
+        sortOrder,
+        filter_customer,
+        readOnly ? "" : "Pending",
+        readOnly ? null : userId,
+        readOnly ? userId : null,
+        filter_reason,
+        filter_assignee,
+        filter_last_action,
+        filter_request,
+      );
+    }
+  };
+
+  const handleReject = async (ids: (string | number)[], reason: string) => {
+    const request = {
+      facility_ids: (ids || []).map(Number),
+      assigned_status: "Rejected",
+      rejection_reason: reason || "",
+    };
+    let success = false;
+    success = await updateStatus(request, tile?.id);
+    if (success) {
+      const Capacity = Number(capacity);
+      const Fixed_cost = Number(fixed_cost);
+      fetchFacility(
+        currentPage,
+        pageSize,
+        searchQuery,
+        statusFilter === "all" ? "" : statusFilter,
+        tierFilter === "all" ? "" : tierFilter,
+        filter_name,
+        regionFilter === "all" ? "" : regionFilter,
+        Capacity,
+        Fixed_cost,
+        sortBy,
+        sortOrder,
+        filter_customer,
+        readOnly ? "" : "Pending",
+        readOnly ? null : userId,
+        readOnly ? userId : null,
+        filter_reason,
+        filter_assignee,
+        filter_last_action,
+        filter_request,
+      );
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ margin: "auto" }}
+    >
+      {/* Backdrop */}
+      <button
+        className="absolute inset-0 bg-background/80 backdrop-blur-sm"
+        onClick={onClose}
+      />
+
+      {/* Modal */}
+      <div
+        className="
+    relative glass-card rounded-xl border border-primary/30
+    shadow-[0_0_50px_rgba(139,92,246,0.3)]
+    w-[95vw] max-w-[1400px]
+    mx-4 max-h-[90vh] overflow-hidden
+    animate-in fade-in zoom-in-95 duration-200
+  "
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-8 py-2 border-b border-border/30">
+          <div className="flex-1">
+            <h2 className="text-2xl font-bold text-foreground">
+              {readOnly ? "Requested" : "Pending"} {tile.label} Approvals
+            </h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              {total} total records {!readOnly && "awaiting approval"}
+            </p>
+            <Tabs
+              value={activeTab}
+              onValueChange={handleTabChange}
+              className="w-full pt-2"
+            >
+              <TabsList className="bg-card border border-border">
+                <TabsTrigger
+                  value="awaits"
+                  className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                >
+                  <Hourglass className="w-4 h-4" />
+                  Awaits
+                </TabsTrigger>
+                <TabsTrigger
+                  value="request"
+                  className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                >
+                  <List className="h-4 w-4" />
+                  Request
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+          <button
+            onClick={onClose}
+            className="hover:bg-muted/50 rounded-lg transition-colors duration-200"
+            title="Close modal"
+          >
+            <X className="w-5 h-5 text-muted-foreground hover:text-foreground" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-5 h-[70vh] overflow-hidden">
+          <FacilityOverviewTable
+            onPageSizeChange={setPageSize}
+            totalRecords={total}
+            pageSize={pageSize}
+            facilities={data}
+            page={currentPage}
+            isLoading={isLoading}
+            onPageChange={setCurrentPage}
+            tierFilter={tierFilter === "all" ? "" : tierFilter}
+            onTierFilterChange={handleTierFilterChange}
+            statusFilter={statusFilter === "all" ? "" : statusFilter}
+            onStatusFilterChange={handleStatusFilterChange}
+            regionFilter={regionFilter}
+            onRegionFilterChange={handleRegionFilterChange}
+            filter_name={filter_name}
+            filter_customer={filter_customer}
+            filter_reason={filter_reason}
+            fixed_cost={fixed_cost}
+            sortBy={sortBy}
+            sortOrder={sortOrder}
+            onFilterNameChange={setFilter_name}
+            onFilterCustomerChange={setCustomer_name}
+            onFilterReasonChange={setFilter_reason}
+            onCapacityChange={setCapacity}
+            onFixedCostChange={setFixed_cost}
+            onSortChange={handleSortChange}
+            onApprove={handleApprove}
+            onReject={handleReject}
+            readOnly={readOnly}
+            filter_last_action={filter_last_action}
+            onLastActionFilter={setFilter_last_action}
+            filter_request_name={filter_request}
+            filter_assignee_name={filter_assignee}
+            onAssigneeNameFilter={handleAssigneeFilterChange}
+            onRequestNameFilter={handleRequestFilterChange}
+          />
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 p-5 border-t border-border/50"></div>
+      </div>
+    </div>
+  );
+};
